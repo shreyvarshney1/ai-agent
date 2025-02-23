@@ -6,7 +6,6 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
-openai.api_key = os.getenv("API_KEY")
 
 def get_mapping(form_fields, user_data):
     """
@@ -38,10 +37,10 @@ def get_mapping(form_fields, user_data):
         "to select the appropriate option(s).\n"
         "The mapping should be in JSON format."
     )
-
     try:
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
+            api_key= os.getenv("API_KEY")
         )
         response = client.chat.completions.create(
             model="deepseek/deepseek-r1-distill-llama-70b:free",
@@ -50,9 +49,8 @@ def get_mapping(form_fields, user_data):
                 {"role": "user", "content": prompt}
             ]
         )
-        mapping_str = response.choices[0].message['content'].strip()
+        mapping_str = response.choices[0].message.content.strip()
         mapping = json.loads(mapping_str)
-        print(mapping)
         return mapping
     except Exception as e:
         print(f"Error getting mapping from OpenAI: {e}")
@@ -100,19 +98,19 @@ def fill_form(form_fields, mapping, user_data):
         if label not in mapping or not mapping[label]:
             print(f"No mapping found for field '{label}', skipping.")
             continue
-
+        
         map_value = mapping[label]
         try:
-            if field['input_type'] == 'text':
+            if field['type'] == 'text':
                 if '+' in map_value:
                     value = evaluate_expression(map_value, user_data)
                 else:
                     value = user_data[map_value]
                 field['element'].send_keys(value)
-            elif field['input_type'] == 'select':
+            elif field['type'] == 'select':
                 value = user_data[map_value]
                 Select(field['element']).select_by_visible_text(value)
-            elif field['input_type'] == 'radio':
+            elif field['type'] == 'radio':
                 value = user_data[map_value]
                 for option_text, input_element in field['options']:
                     if option_text == value:
@@ -120,7 +118,7 @@ def fill_form(form_fields, mapping, user_data):
                         break
                 else:
                     print(f"Option '{value}' not found for radio field '{label}'.")
-            elif field['input_type'] == 'checkbox':
+            elif field['type'] == 'checkbox':
                 values = user_data[map_value]
                 if not isinstance(values, list):
                     values = [values]

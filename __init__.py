@@ -38,19 +38,17 @@ def main(form_url, user_data):
 
     try:
         # Open Google Form and extract fields
-        form_fields = open_google_form_selenium(driver, form_url)
+        form_fields = open_google_form_selenium(form_url)
         
         if not form_fields:
             print("No form fields found.")
             return
-            
         # Get AI mapping for form fields
         mapping = get_mapping(form_fields, user_data)
         
         if not mapping:
             print("Failed to get field mapping.")
             return
-
         # Fill form fields
         fill_form(driver, form_fields, mapping, user_data)
         

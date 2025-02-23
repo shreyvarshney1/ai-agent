@@ -4,7 +4,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from playwright.sync_api import sync_playwright
 
-def open_google_form_selenium(driver, url):
+def open_google_form_selenium(url):
     """
     Extract form fields from a Google Form using Selenium and Playwright.
     
@@ -27,8 +27,6 @@ def open_google_form_selenium(driver, url):
         field_elements = page.query_selector_all("div[role='listitem']")
 
         for index, field in enumerate(field_elements):
-            print(f"\nDEBUG: Field {index + 1}: {field.inner_text()}")  # Debugging
-
             # Extract field label (try multiple selectors)
             label_element = field.query_selector("div.M7eMe, div[role='heading']")
             label = label_element.inner_text() if label_element else "Unknown Field"
@@ -42,7 +40,7 @@ def open_google_form_selenium(driver, url):
 
             form_fields.append({
                 "label": label,
-                "input_type": input_type
+                "type": input_type
             })
 
         browser.close()
