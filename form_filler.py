@@ -40,7 +40,6 @@ def get_mapping(form_fields, user_data):
             base_url="https://openrouter.ai/api/v1",
             api_key= os.getenv("API_KEY")
         )
-        print(prompt)
         response = client.chat.completions.create(
             model="deepseek/deepseek-r1-distill-llama-70b:free",
             messages=[
