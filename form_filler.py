@@ -1,15 +1,17 @@
 import json
 import os
+import re
 from selenium.webdriver.support.ui import Select
 from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
+
 def get_mapping(form_fields, user_data):
     """
     Use OpenAI API to map form fields to user data.
-    
+
     Args:
         form_fields: List of dictionaries containing field details.
         user_data: Dictionary of user data to map to form fields
@@ -20,7 +22,6 @@ def get_mapping(form_fields, user_data):
     # Construct the prompt for OpenAI
     prompt = "Here are the form fields:\n"
     for field in form_fields:
-        print(field)
         prompt += f"- Label: '{field['label']}', type: {field['type']}"
         if field['type'] in ['select', 'radio', 'checkbox']:
             if field['type'] == 'select':
@@ -38,26 +39,37 @@ def get_mapping(form_fields, user_data):
     try:
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
-            api_key= os.getenv("API_KEY")
+            api_key=os.getenv("API_KEY")
         )
         response = client.chat.completions.create(
             model="deepseek/deepseek-r1-distill-llama-70b:free",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that maps form fields to user data."},
+                {"role": "system", "content": "You are a helpful assistant that answers form fields in context to user data. Give answer as a json taking key as 'Label' and value as answer to the question. IF USER CONTEXT IS NOT ENOUGH THAN TRY ANSWERING YOURSELF. YOU CAN ANSWER ACCORDING TO YOUR KNOWLEDGE USING USER DATA AS YOUR CONTEXT."},
                 {"role": "user", "content": prompt}
             ]
         )
         mapping_str = response.choices[0].message.content.strip()
-        mapping = json.loads(mapping_str)
-        return mapping
+        # print(f"Raw response from OpenAI: {mapping_str}")  # Debug response
+        pattern = r'(\{([\s\S]+?)\})'
+        match = re.search(pattern, mapping_str, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+            # Convert JSON string to Python dictionary
+            print(json_str)
+            data = json.loads(json_str)
+            return data
+        else:
+            print("No JSON block found.")
+            return {}
     except Exception as e:
         print(f"Error getting mapping from OpenAI: {e}")
         return {}
 
+
 def evaluate_expression(expr, user_data):
     """
     Evaluate an expression that combines user data keys (e.g., 'first_name + " " + last_name').
-    
+
     Args:
         expr: String expression to evaluate.
         user_data: Dictionary of user data.
@@ -81,10 +93,11 @@ def evaluate_expression(expr, user_data):
         print(f"Error evaluating expression '{expr}': {e}")
         return ""
 
+
 def fill_form(form_fields, mapping, user_data):
     """
     Fill the form fields based on the AI-generated mapping.
-    
+
     Args:
         driver: Selenium WebDriver instance.
         form_fields: List of dictionaries containing field details.
@@ -96,7 +109,7 @@ def fill_form(form_fields, mapping, user_data):
         if label not in mapping or not mapping[label]:
             print(f"No mapping found for field '{label}', skipping.")
             continue
-        
+
         map_value = mapping[label]
         try:
             if field['type'] == 'text':
@@ -115,7 +128,8 @@ def fill_form(form_fields, mapping, user_data):
                         input_element.click()
                         break
                 else:
-                    print(f"Option '{value}' not found for radio field '{label}'.")
+                    print(
+                        f"Option '{value}' not found for radio field '{label}'.")
             elif field['type'] == 'checkbox':
                 values = user_data[map_value]
                 if not isinstance(values, list):
