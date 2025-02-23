@@ -1,6 +1,5 @@
 import json
 import os
-import openai
 from selenium.webdriver.support.ui import Select
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -21,12 +20,11 @@ def get_mapping(form_fields, user_data):
     # Construct the prompt for OpenAI
     prompt = "Here are the form fields:\n"
     for field in form_fields:
+        print(field)
         prompt += f"- Label: '{field['label']}', type: {field['type']}"
         if field['type'] in ['select', 'radio', 'checkbox']:
             if field['type'] == 'select':
-                options = [opt.text for opt in Select(field['element']).options if opt.text]
-            else:
-                options = [text for text, _ in field['options']]
+                options = [text for text in field['options']]
             prompt += f", options: {options}"
         prompt += "\n"
     prompt += f"And here is the user's data: {user_data}\n"
@@ -42,6 +40,7 @@ def get_mapping(form_fields, user_data):
             base_url="https://openrouter.ai/api/v1",
             api_key= os.getenv("API_KEY")
         )
+        print(prompt)
         response = client.chat.completions.create(
             model="deepseek/deepseek-r1-distill-llama-70b:free",
             messages=[
