@@ -1,0 +1,9 @@
+@echo off
+title AI Agent Setup
+echo Setting up Python virtual environment...
+python -m venv venv
+echo Activating virtual environment...
+call venv\Scripts\activate
+echo Installing required packages...
+pip install selenium webdriver-manager openai playwright
+echo Setup complete!
