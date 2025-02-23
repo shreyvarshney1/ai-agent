@@ -1,26 +1,14 @@
-from browser import open_browser
-from form_parser import get_form_fields
-from form_filler import fill_form
-from llm_helper import predict_field_value
+import asyncio
+from playwright.async_api import async_playwright
 
-def main():
-    url = "https://docs.google.com/forms/d/e/1FAIpQLSen6AIaYLHM-u4PFhK7xy8SP7KRtyJVPPeqTb0Uz52ph0uY7A/viewform?usp=sharing"
-    browser, context, page = open_browser(url)  # Keeping context
+async def main():
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.goto("https://forms.gle/euGW8A8MwAjrfUE39")
+        await asyncio.sleep(5)  # Ensure content loads properly
+        print(await page.content())  # Print page content
 
-    try:
-        # Extract form fields
-        fields = get_form_fields(page)
-        
-        # Predict field values using Gemini API
-        form_data = {key: predict_field_value(key, "Provide appropriate data") for key in fields.keys()}
-        
-        # Fill and submit the form
-        fill_form(page, form_data)
-    
-    finally:
-        # Ensure context and browser are closed properly
-        context.close()
-        browser.close()
-
+# Ensure proper event loop handling
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

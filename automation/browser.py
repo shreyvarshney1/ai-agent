@@ -1,30 +1,18 @@
-from playwright.sync_api import sync_playwright
-from llm_helper import predict_field_value
-from form_filler import fill_form
-from form_parser import get_form_fields
-from playwright.sync_api import sync_playwright
+from playwright_stealth.stealth import stealth_async
 
-_playwright = sync_playwright().start()  # Keep Playwright active globally
+from playwright.async_api import async_playwright
 
-def open_browser(url):
-    """Opens a browser context and navigates to the given URL."""
-    browser = _playwright.chromium.launch(headless=False)
-    context = browser.new_context()  # Create a new context
-    page = context.new_page()
-    page.goto(url)
-    return browser, context, page  # Return all objects properly
+async def open_google_form(url):
+    playwright = await async_playwright().start()
+    browser = await playwright.chromium.launch(headless=False)  # Run in visible mode for debugging
+    context = await browser.new_context(
+    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
 
-def handle_multiple_tabs(urls):
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        context = browser.new_context()
-        
-        pages = [context.new_page() for _ in urls]
-        
-        for page, url in zip(pages, urls):
-            page.goto(url)
-            fields = get_form_fields(page)
-            form_data = {key: predict_field_value(key, "Provide appropriate data") for key in fields.keys()}
-            fill_form(page, form_data)
+    page = await context.new_page()
+    
+    await stealth_async(page)
 
-        browser.close()
+    
+    await page.goto(url)
+    return browser, context, page, playwright
