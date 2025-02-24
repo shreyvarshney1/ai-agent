@@ -2,17 +2,7 @@ from playwright.sync_api import sync_playwright
 import time
 
 
-def open_google_form_selenium(url):
-    """
-    Extract form fields from a Google Form using Selenium and Playwright.
-
-    Args:
-        driver: Selenium WebDriver instance
-        url: URL of the Google Form
-
-    Returns:
-        List of dictionaries containing field details
-    """
+def open_google_form(url):
     with sync_playwright() as p:
         # Change to False to see the browser
         browser = p.chromium.launch(headless=True)
@@ -21,8 +11,6 @@ def open_google_form_selenium(url):
         page.wait_for_load_state("domcontentloaded")
 
         form_fields = []
-
-        # Select all form fields
         field_elements = page.query_selector_all("div[role='listitem']")
 
         for field in field_elements:
@@ -34,7 +22,6 @@ def open_google_form_selenium(url):
 
             field_type = "unknown"
             options = []
-            # Debugging: Print detected field name
             # print(f"[DEBUG] Found Field: {title}")
 
             try:
@@ -58,18 +45,16 @@ def open_google_form_selenium(url):
                 elif field.query_selector("div[role='listbox']"):
                     field_type = "select"
                     dropdown = field.query_selector("div[role='listbox']")
-                    dropdown.click()  # Open the dropdown
-                    time.sleep(1)  # Allow the dropdown to open
+                    dropdown.click()
+                    time.sleep(1)
                     option_elements = page.query_selector_all(
                         "div[role='option']")
 
                     for option in option_elements:
                         opt_text = option.inner_text().strip()
-                        # Filter out the default placeholder (e.g., "Choose")
                         if opt_text and opt_text.lower() != "choose":
                             options.append(opt_text)
 
-                    # Close the dropdown by clicking outside (e.g., the body)
                     page.click("body")
             except Exception as e:
                 print(

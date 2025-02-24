@@ -1,25 +1,15 @@
 import json
 import os
 import re
-from selenium.webdriver.support.ui import Select
+import time
 from openai import OpenAI
 from dotenv import load_dotenv
+from playwright.sync_api import sync_playwright
 
 load_dotenv()
 
 
 def get_mapping(form_fields, user_data):
-    """
-    Use OpenAI API to map form fields to user data.
-
-    Args:
-        form_fields: List of dictionaries containing field details.
-        user_data: Dictionary of user data to map to form fields
-
-    Returns:
-        Dictionary mapping field labels to user data keys or expressions.
-    """
-    # Construct the prompt for OpenAI
     prompt = "Here are the form fields:\n"
     for field in form_fields:
         prompt += f"- Label: '{field['label']}', type: {field['type']}"
@@ -30,9 +20,8 @@ def get_mapping(form_fields, user_data):
         prompt += "\n"
     prompt += f"And here is the user's data: {user_data}\n"
     prompt += (
-        "Please provide a mapping where each form field label is a key, and its value is the "
-        "corresponding user data key or an expression that combines user data keys to get the value for that field.\n"
-        "For select, radio, and checkbox fields, the value should be the user data key whose value will be used "
+        "Please provide a mapping where each form field label is a key"
+        "For select, radio, and checkbox fields, the value should be value will be used "
         "to select the appropriate option(s).\n"
         "The mapping should be in JSON format."
     )
@@ -54,7 +43,6 @@ def get_mapping(form_fields, user_data):
         match = re.search(pattern, mapping_str, re.DOTALL)
         if match:
             json_str = match.group(1)
-            # Convert JSON string to Python dictionary
             print(json_str)
             data = json.loads(json_str)
             return data
@@ -94,48 +82,61 @@ def evaluate_expression(expr, user_data):
         return ""
 
 
-def fill_form(form_fields, mapping, user_data):
-    """
-    Fill the form fields based on the AI-generated mapping.
+def fill_form(url, mapping):
+    with sync_playwright() as p:
+        # Change to False to see the browser
+        browser = p.chromium.launch(headless=False)
+        page = browser.new_page()
+        page.goto(url)
+        page.wait_for_load_state("domcontentloaded")
 
-    Args:
-        driver: Selenium WebDriver instance.
-        form_fields: List of dictionaries containing field details.
-        mapping: Dictionary mapping labels to user data keys or expressions.
-        user_data: Dictionary of user data.
-    """
-    for field in form_fields:
-        label = field['label']
-        if label not in mapping or not mapping[label]:
-            print(f"No mapping found for field '{label}', skipping.")
-            continue
+        field_elements = page.query_selector_all("div[role='listitem']")
 
-        map_value = mapping[label]
+        for field in field_elements:
+            try:
+                title = field.query_selector(
+                    "div[role='heading']").inner_text().split("\n")[0].strip()
+            except Exception:
+                title = "Unknown"
+            if not mapping[title]:
+                print(f"No mapping found for field '{title}', skipping.")
+                continue
+
+            map_value = mapping[title]
+            try:
+                if field.query_selector("input[type='text'], textarea"):
+                    field.query_selector(
+                        "input[type='text'], textarea").fill(map_value)
+                elif field.query_selector("div[role='radiogroup']"):
+                    option_elements = field.query_selector("div[role='radio']")
+                    for option in option_elements:
+                        opt_text = option.inner_text().strip()
+                        if opt_text == map_value:
+                            option.check()
+                elif field.query_selector("div[role='listbox']"):
+                    dropdown = field.query_selector("div[role='listbox']")
+                    dropdown.click()
+                    time.sleep(1)
+                    option_elements = page.query_selector_all(
+                        "div[role='option']")
+                    for option in option_elements:
+                        opt_text = option.inner_text().strip()
+                        if opt_text == map_value:
+                            option.click()
+                            time.sleep(2)
+                elif field.query_selector("div[role='checkbox']"):
+                    option_elements = field.query_selector(
+                        "div[role='checkbox']")
+                    for option in option_elements:
+                        opt_text = option.inner_text().strip()
+                        if opt_text == map_value:
+                            option.check()
+            except Exception as e:
+                print(f"Error filling field '{title}': {e}")
         try:
-            if field['type'] == 'text':
-                if '+' in map_value:
-                    value = evaluate_expression(map_value, user_data)
-                else:
-                    value = user_data[map_value]
-                field['element'].send_keys(value)
-            elif field['type'] == 'select':
-                value = user_data[map_value]
-                Select(field['element']).select_by_visible_text(value)
-            elif field['type'] == 'radio':
-                value = user_data[map_value]
-                for option_text, input_element in field['options']:
-                    if option_text == value:
-                        input_element.click()
-                        break
-                else:
-                    print(
-                        f"Option '{value}' not found for radio field '{label}'.")
-            elif field['type'] == 'checkbox':
-                values = user_data[map_value]
-                if not isinstance(values, list):
-                    values = [values]
-                for option_text, input_element in field['options']:
-                    if option_text in values:
-                        input_element.click()
+            page.query_selector("div[aria-label='Submit']").click()
+            print("Form submitted successfully.")
         except Exception as e:
-            print(f"Error filling field '{label}': {e}")
+            print(f"Error clicking submit button: {e}")
+        time.sleep(2)
+        browser.close()
